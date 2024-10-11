@@ -1,0 +1,322 @@
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace MovieRentalManagementSystem
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            MovieManager manager = new MovieManager();
+            manager.CreateTable();
+            bool check = true;
+            while (check)
+            {
+                Console.WriteLine("--Movie ManageMent--");
+                Console.WriteLine("1. Add a Movie");
+                Console.WriteLine("2. View All Movies");
+                Console.WriteLine("3. Update a Movie");
+                Console.WriteLine("4. Delete a Movie");
+                Console.WriteLine("5. View Movies By Id");
+                Console.WriteLine("6. Exit");
+
+                string option = Console.ReadLine();
+
+                switch (option)
+                {
+                    case "1":
+                        Console.Write("Enter Movie Title: ");
+                        string title = Console.ReadLine();
+                        string capitalize = char.ToUpper(title[0]) + title.Substring(1);
+                        Console.Write("Enter Movie Director: ");
+                        string director = Console.ReadLine();
+                        Console.Write("Enter Movie RentalPrice: ");
+                        decimal rentalPrice = Convert.ToDecimal(Console.ReadLine());
+                        var FinalRental = manager.RentalPriceCheck(rentalPrice);
+                        manager.CreateMovie(new Movie(capitalize, director, FinalRental));
+                        break;
+                    case "2":
+                        //manager.ReadMovies();
+                        Console.WriteLine("Movies");
+                        manager.ReadMovies();
+                        break;
+                    case "3":
+                        Console.Write("Enter Movie Id: ");
+                        int movieid = Convert.ToInt32(Console.ReadLine());
+                        Console.Write("Enter Movie New Title: ");
+                        string newtitle = Console.ReadLine();
+                        Console.Write("Enter Movie New Director: ");
+                        string newdirector = Console.ReadLine();
+                        Console.Write("Enter Movie New RentalPrice: ");
+                        decimal newrentalPrice = Convert.ToDecimal(Console.ReadLine());
+                        manager.UpdateMovie(movieid, newtitle, newdirector, newrentalPrice);
+                        //manager.UpdateMovie(movieid, newtitle, newdirector, newrentalPrice);
+                        break;
+                    case "4":
+                        Console.Write("Enter Movie Id to Delete: ");
+                        int deleteId = Convert.ToInt32(Console.ReadLine());
+                        manager.DeleteMovie(deleteId);
+                        break;
+                    case "5":
+                        Console.Write("Enter Your Id :");
+                        var id = Convert.ToInt32(Console.ReadLine());
+
+                        manager.GetById(id);
+                        break;
+                    case "6":
+                        Environment.Exit(0);
+                        break;
+                    default:
+                        Console.WriteLine("Get Out My Office");
+                        break;
+                }
+            }
+
+        }
+    }
+
+    public class Movie
+    {
+        public int MovieID { get; set; }
+        public string Title { get; set; }
+        public string Director { get; set; }
+        public decimal RentalPrice { get; set; }
+
+        public int totalMovie {  get; set; }
+
+        public Movie(string title, string director, decimal rentalPrice)
+        {
+            Title = title;
+            Director = director;
+            RentalPrice = rentalPrice;
+            totalMovie++;
+        }
+        public Movie()
+        {
+
+        }
+
+        public override string ToString()
+        {
+            return $"ID: {MovieID}, Title: {Title}, Director: {Director}, RentalPrice: ${RentalPrice}.00";
+        }
+
+        public virtual string  displaymovieinfo()
+        {
+            return ToString();
+        }
+    }
+
+    public class MovieManager
+    {
+
+
+        public readonly string connectionString = "server=(localdb)\\Local;database=SS;Integrated Security=true";
+
+        public void CreateTable()
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                var Command = connection.CreateCommand();
+                Command.CommandText = @"
+                        IF NOT EXISTS(SELECT * from sys.tables where name = 'movies')
+                            BEGIN  
+                               CREATE TABLE movies(
+                                          Id INT IDENTITY(1,1) PRIMARY KEY,
+                                          Title VARCHAR(20),
+                                          Director VARCHAR(20),
+                                          RentalPrice DECIMAL
+                               );
+                            END
+                ";
+                Command.ExecuteNonQuery();
+            }
+
+        }
+
+
+
+        public void CreateMovie(Movie movie)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                            INSERT INTO Movies(Title,Director,RentalPrice) 
+                            Values(@Title,@Director,@RentalPrice);
+                ";
+                command.Parameters.AddWithValue("@Title", movie.Title);
+                command.Parameters.AddWithValue("@Director", movie.Director);
+                command.Parameters.AddWithValue("@RentalPrice", movie.RentalPrice);
+
+                command.ExecuteNonQuery();
+            }
+            Console.WriteLine("Movie Added Successfully");
+        }
+
+
+
+
+        public void ReadMovies()
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+
+                var data = new List<Movie>();
+                var Command = connection.CreateCommand();
+                Command.CommandText = @"
+                      SELECT * FROM movies";
+                using (var reader = Command.ExecuteReader())
+                {
+                    while (reader.Read())
+                    {
+                        var obj = new Movie
+                        {
+                            MovieID = reader.GetInt32(0),
+                            Title = reader.GetString(1),
+                            Director = reader.GetString(2),
+                            RentalPrice = reader.GetDecimal(3)
+                        };
+                        data.Add(obj);
+                        Console.WriteLine(obj.ToString());
+                    }
+
+
+                }
+            }
+        }
+
+
+
+        public void GetById(int id)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                                        SELECT * FROM Movies
+                                        WHERE Id = @id
+                                        ";
+
+                command.Parameters.AddWithValue("@id", id);
+                var reader = command.ExecuteReader();
+                if (reader.Read())
+                {
+                    var obj = new Movie
+                    {
+                        MovieID = reader.GetInt32(0),
+                        Title = reader.GetString(1),
+                        Director = reader.GetString(2),
+                        RentalPrice = reader.GetDecimal(3)
+                    };
+                    Console.WriteLine(obj.ToString());
+                }
+            }
+        }
+
+        public void UpdateMovie(int id, string newTitle, string newDirector, decimal newPrice)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                                        UPDATE Movies
+                                        SET Title = @Title,
+                                        Director = @Director,
+                                        RentalPrice = @RentalPrice
+                                        WHERE Id = @id
+                                        ";
+
+                command.Parameters.AddWithValue("@Title", newTitle);
+                command.Parameters.AddWithValue("@Director", newDirector);
+                command.Parameters.AddWithValue("@RentalPrice", newPrice);
+                command.Parameters.AddWithValue("@id", id);
+
+                command.ExecuteNonQuery();
+            }
+            Console.WriteLine("Movie Updated SuccessFully..");
+        }
+
+
+
+        public void DeleteMovie(int id)
+        {
+            using (var connection = new SqlConnection(connectionString))
+            {
+                connection.Open();
+                var command = connection.CreateCommand();
+                command.CommandText = @"
+                                        DELETE Movies
+                                        WHERE Id = @id
+                                        ";
+                command.Parameters.AddWithValue("@id", id);
+                command.ExecuteNonQuery();
+            }
+            Console.WriteLine("Deleted");
+
+        }
+
+
+        public decimal RentalPriceCheck(decimal data)
+        {
+            if (data > 0)
+            {
+                return data;
+            }
+            else
+            {
+                while (data <= 0)
+                {
+                    Console.WriteLine("RentalPrice must have Positive Value");
+                    Console.Write("ReEnter Rental Price :");
+                    data = Convert.ToDecimal(Console.ReadLine());
+                }
+                return data;
+            }
+        }
+
+    }
+
+    public class DigitalMovie : Movie
+    {
+        public string Fileforamt {  get; set; }
+        public decimal duration {  get; set; }
+
+        public DigitalMovie(string title, string director, decimal rentalPrice,string fileformat,decimal duration) :base(title,director,rentalPrice) 
+        {
+            this.Fileforamt = fileformat;
+            this.duration = duration;
+        }
+
+
+    }
+
+    public class DvdMovie : Movie {
+
+
+        public decimal diskweight { get; set; }
+        public decimal duration { get; set; }
+
+        public DvdMovie(string title, string director, decimal rentalPrice, decimal diskweidht, decimal duration) : base(title, director, rentalPrice)
+        {
+            this.diskweight = diskweidht;
+            this.duration = duration;
+        }
+
+        public override string displaymovieinfo()
+        {
+            return $"{base.displaymovieinfo()},DISKWEIGHT:{diskweight},DURATION:{duration}";
+        }
+    }
+
+}
